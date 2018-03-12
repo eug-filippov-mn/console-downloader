@@ -1,0 +1,20 @@
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                %d{HH:mm:ss.SSS} %magenta([%thread]) %yellow(uuid=%X{uuid}) %highlight(%-5level) %cyan(%logger{36}) - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <logger name="org.apache.http.impl.conn" level="debug"/>
+    <logger name="org.apache.http.impl.client" level="debug"/>
+    <logger name="com.eug.md" level="debug"/>
+
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <shutdownHook/>
+</configuration>
