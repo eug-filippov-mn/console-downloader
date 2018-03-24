@@ -80,10 +80,8 @@ class Downloader(private val config: DownloaderConfig): Closeable {
         }
 
         val outputStreams = outputFilePaths.map { path ->
-            path.toFile().outputStream()
             Files.newOutputStream(path, StandardOpenOption.CREATE).buffered()
         }
-
         return MultiOutputStream(outputStreams).use { bandwidthThrottlingInputStream.copyTo(it) }
     }
 

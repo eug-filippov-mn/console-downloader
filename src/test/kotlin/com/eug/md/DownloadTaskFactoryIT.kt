@@ -43,11 +43,11 @@ class DownloadTaskFactoryIT {
     }
 
     @Test
-    fun `should return invalid row number when passed path to file which contains line with extra tokens `() {
+    fun `should return invalid row number when passed path to file which contains line with less tokens than need`() {
         val linksFile = tempFolder.createFile(linksFileName)
         val fileContent = """
             http://domain.net/file-name outFileName
-            http://domain.net/file-name outFileName extraToken
+            http://domain.net/file-name
         """.trimIndent()
         linksFile.writeText(fileContent)
 
@@ -81,7 +81,7 @@ class DownloadTaskFactoryIT {
         val linksFile = tempFolder.createFile(linksFileName)
         val fileContent = """
             invalidUrl outFileName
-            http://domain.net/file-name outFileName extraToken
+            http://domain.net/file-name
         """.trimIndent()
         linksFile.writeText(fileContent)
 
@@ -158,6 +158,29 @@ class DownloadTaskFactoryIT {
                 Executable { assertEquals(2, tasks[0].fileNames.size) },
                 Executable { assertEquals(fileName1, tasks[0].fileNames[0]) },
                 Executable { assertEquals(fileName2, tasks[0].fileNames[1]) }
+        )
+    }
+
+    @Test
+    fun `should process file when links file has file name with whitespaces`() {
+        val linksFile = tempFolder.createFile(linksFileName)
+
+        val url = "http://domain.net/file-name"
+        val fileName1 = "out File Name 1"
+
+        val fileContent = "$url $fileName1"
+
+        linksFile.writeText(fileContent)
+
+        val (tasks, invalidRowNumbers, rowsCount) = DownloadTaskFactory.createTasks(linksFile.toPath())
+
+        assertEquals(1, rowsCount)
+        assertTrue(invalidRowNumbers.isEmpty())
+        assertEquals(1, tasks.size)
+        assertAll(
+                Executable { assertEquals(url, tasks[0].url) },
+                Executable { assertEquals(1, tasks[0].fileNames.size) },
+                Executable { assertEquals(fileName1, tasks[0].fileNames[0]) }
         )
     }
 }

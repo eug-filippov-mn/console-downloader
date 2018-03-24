@@ -2,6 +2,7 @@ package com.eug.md
 
 import com.eug.md.utils.*
 import com.eug.md.utils.concurrent.threadPoolExecutor
+import com.google.common.util.concurrent.MoreExecutors
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -99,8 +100,7 @@ class ConsoleDownloaderApp private constructor(
             }
 
         } finally {
-            executor.shutdown()
-            executor.awaitTermination(1, TimeUnit.MINUTES)
+            MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.MINUTES)
         }
     }
 
