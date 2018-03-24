@@ -1,13 +1,13 @@
 package com.eug.md
 
-import com.eug.md.utils.MeasuredResult
+import com.eug.md.utils.*
 import com.eug.md.utils.concurrent.threadPoolExecutor
-import com.eug.md.utils.joinAll
-import com.eug.md.utils.measureExecTime
-import com.xenomachina.argparser.ArgParser
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.io.PrintStream
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.*
 import java.util.function.Supplier
@@ -15,64 +15,72 @@ import kotlin.system.exitProcess
 
 
 fun main(args: Array<String>) {
-    ConsoleDownloaderApp(args).run()
+    ConsoleDownloaderApp.run(args)
 }
 
-class ConsoleDownloaderApp {
-    companion object {
-        private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
-        private val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
-    }
+class ConsoleDownloaderApp private constructor(
+        private val settings: Settings,
+        private val downloader: Downloader,
+        private val executor: ExecutorService) {
 
     private val out: PrintStream = System.out
     private val scanner: Scanner = Scanner(System.`in`)
-    private val options: Options
-    private val downloader: Downloader
-    private val executor: ExecutorService
 
-    constructor(args: Array<String>) {
-        try {
-            options = Options(ArgParser(args))
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
+        private const val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
 
-            val downloaderConfig = DownloaderConfig(
-                    outDirPath = options.outputDirPath,
-                    speedLimitInBytes = options.speedLimit,
-                    perRouteKeepAliveConnectionLimit = options.threadsNumbers,
-                    maxKeepAliveConnectionTotal = maxOf(MAX_KEEP_ALIVE_CONNECTION_TOTAL, options.threadsNumbers)
-            )
-            downloader = Downloader(downloaderConfig)
+        fun run(args: Array<String>) {
+            try {
+                val settings = Settings.from(args)
+                createOutDirIfNotExists(settings.outputDirPath)
 
-            executor = threadPoolExecutor(
-                    numberOfThreads = options.threadsNumbers,
-                    threadsNameFormat = "app-pool thrd-%d"
-            )
-        } catch (e: Exception) {
-            log.error(e.message, e)
-            System.err.println(e.message)
-            exitProcess(-1)
+                val downloaderConfig = DownloaderConfig(
+                        outDirPath = settings.outputDirPath,
+                        speedLimitInBytes = settings.speedLimitInBytes,
+                        perRouteKeepAliveConnectionLimit = settings.threadsNumber,
+                        maxKeepAliveConnectionTotal = maxOf(MAX_KEEP_ALIVE_CONNECTION_TOTAL, settings.threadsNumber)
+                )
+                val downloader = Downloader(downloaderConfig)
+                val executor = threadPoolExecutor(
+                        numberOfThreads = settings.threadsNumber,
+                        threadsNameFormat = "app-pool thrd-%d"
+                )
+
+                val app = ConsoleDownloaderApp(settings, downloader, executor)
+                app.run()
+            } catch (e: Exception) {
+                log.error(e.message, e)
+                System.err.println(e.message)
+                exitProcess(-1)
+            }
+        }
+
+        private fun createOutDirIfNotExists(outDirPath: Path) {
+            try {
+                if (!Files.exists(outDirPath)) {
+                    Files.createDirectories(outDirPath)
+                }
+            } catch (e: IOException) {
+                throw OutDirCreationException(outDirPath, e)
+            }
         }
     }
 
     fun run() {
-        try {
-            log.debug("Start application")
-            log.debug("{}", options)
+        log.debug("Start application")
+        log.debug("{}", settings)
 
-            val measuredDownloadingResults = measureExecTime { downloadFiles() }
+        val measuredDownloadingResults = measureExecTime { downloadFiles() }
 
-            log.debug("Downloading results {}", measuredDownloadingResults)
+        log.debug("Downloading results {}", measuredDownloadingResults)
 
-            out.println(ToTableFormatter.format(measuredDownloadingResults))
-        } catch (e: Exception) {
-            log.error(e.message, e)
-            System.err.println(e.message)
-            exitProcess(-1)
-        }
+        out.println(ToTableFormatter.format(measuredDownloadingResults))
     }
 
     private fun downloadFiles() : List<MeasuredResult<DownloadResult>> {
         try {
-            val taskCreationResult = DownloadTaskFactory.createTasks(options.linksFilePath)
+            val taskCreationResult = DownloadTaskFactory.createTasks(settings.linksFilePath)
 
             if (taskCreationResult.invalidRowNumbers.isNotEmpty()) {
                 out.println("Invalid format at rows - ${taskCreationResult.invalidRowNumbers}.")

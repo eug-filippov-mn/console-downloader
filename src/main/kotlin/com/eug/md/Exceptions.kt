@@ -5,7 +5,23 @@ import java.nio.file.Path
 
 sealed class ConsoleDownloaderException(msg: String, cause: Throwable? = null) : RuntimeException(msg, cause)
 
-class NotValidOptionException(msg: String, value: Any) : ConsoleDownloaderException(msg)
+class NotValidOptionsException(msg: String, cause: Throwable? = null) : ConsoleDownloaderException(msg)
+
+class SpeedLimitParseException private constructor(msg: String, cause: Throwable? = null)
+    : ConsoleDownloaderException(msg, cause) {
+
+    companion object {
+
+        fun invalidSpeedMultiplier(speedMultiplier: Char) =
+                SpeedLimitParseException("Unrecognized speed multiplier - $speedMultiplier")
+
+        fun invalidSpeedFormat(cause: Throwable) =
+                SpeedLimitParseException("Invalid speed format", cause)
+    }
+}
+
+class OutDirCreationException(outDirPath: Path, cause: Throwable)
+    : ConsoleDownloaderException("Unable to create out dir - $outDirPath", cause)
 
 open class LinksFileParseException(msg: String, cause: Throwable? = null) : ConsoleDownloaderException(msg, cause) {
     companion object {
@@ -25,9 +41,6 @@ open class LinksFileParseException(msg: String, cause: Throwable? = null) : Cons
                         "Unable to read links from file \"$linksFilePath\" cause access is denied", cause)
     }
 }
-
-class SpeedLimitParseException(value: String, cause: Throwable? = null)
-    : ConsoleDownloaderException("Unable to parse passed speed limit - \"$value\"", cause)
 
 class UnexpectedResponseStatusException(status: Int)
     : ConsoleDownloaderException("Unexpected response status - $status")

@@ -9,6 +9,7 @@ import io.github.glytching.junit.extension.random.Random
 import io.github.glytching.junit.extension.random.RandomBeansExtension
 import org.apache.http.HttpHeaders
 import org.apache.http.HttpStatus
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -188,6 +189,32 @@ class DownloaderIT(
         testRedirectionForStatus(permanentRedirect, firstFileNameUrlPath, secondFileNameUrlPath, outFileName)
     }
 
+    private fun testRedirectionForStatus(
+            status: Int, firstFileNameUrlPath: String, secondFileNameUrlPath: String, outFileName: String) {
+
+        val redirectUrl = resolveUrlToFile(secondFileNameUrlPath)
+        val firstUrlResponse = status(status).withHeader(HttpHeaders.LOCATION, redirectUrl)
+
+        mockServer.stubFor(get(urlMatching("/$firstFileNameUrlPath"))
+                .willReturn(firstUrlResponse))
+
+        mockServer.stubFor(get(urlMatching("/$secondFileNameUrlPath"))
+                .willReturn(ok().withBodyFile(SAMPLE_FILE_NAME)))
+
+        val task = DownloadTask(
+                number = 1,
+                url = resolveUrlToFile(firstFileNameUrlPath),
+                fileNames = listOf(outFileName)
+        )
+        val downloadResult = Downloader(defaultConfig).use { it.download(task) }
+        assertEquals(Status.SUCCESS, downloadResult.status)
+        assertEquals(downloadResult::class, SuccessResult::class)
+
+        val sampleFileSize = sizeOfTestResourcesFile(SAMPLE_FILE_NAME)
+        assertEquals(sampleFileSize, downloadResult.savedBytesCount)
+        assertEquals(sampleFileSize, outFileSize(outFileName))
+    }
+
     @Test
     fun `should create directories after downloading if they exist in file name path`(
             @Random fileNameUrlPath: String, @Random outFileName: String, @Random outFileDirName: String) {
@@ -209,29 +236,6 @@ class DownloaderIT(
         val sampleFileSize = sizeOfTestResourcesFile(SAMPLE_FILE_NAME)
         assertEquals(sampleFileSize, downloadResult.savedBytesCount)
         assertEquals(sampleFileSize, outFileSize(outFilePath))
-    }
-
-    private fun testRedirectionForStatus(
-            status: Int, firstFileNameUrlPath: String, secondFileNameUrlPath: String, outFileName: String) {
-
-        val redirectUrl = resolveUrlToFile(secondFileNameUrlPath)
-        val firstUrlResponse = status(status).withHeader(HttpHeaders.LOCATION, redirectUrl)
-
-        mockServer.stubFor(get(urlMatching("/$firstFileNameUrlPath"))
-                .willReturn(firstUrlResponse))
-
-        mockServer.stubFor(get(urlMatching("/$secondFileNameUrlPath"))
-                .willReturn(ok().withBodyFile(SAMPLE_FILE_NAME)))
-
-        val task =
-                DownloadTask(number = 1, url = resolveUrlToFile(firstFileNameUrlPath), fileNames = listOf(outFileName))
-        val downloadResult = Downloader(defaultConfig).use { it.download(task) }
-        assertEquals(Status.SUCCESS, downloadResult.status)
-        assertEquals(downloadResult::class, SuccessResult::class)
-
-        val sampleFileSize = sizeOfTestResourcesFile(SAMPLE_FILE_NAME)
-        assertEquals(sampleFileSize, downloadResult.savedBytesCount)
-        assertEquals(sampleFileSize, outFileSize(outFileName))
     }
 
     private fun resolveUrlToFile(fileName: String) = "$mockServerUri/$fileName"

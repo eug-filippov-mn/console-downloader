@@ -7,26 +7,26 @@ object SpeedLimitParser {
 
     fun parseAsBytes(speed: String): Double {
         try {
-            val speedNumber = parseSpeedNumber(speed)
-            val speedMultiplier = parseSpeedMultiplier(speed)
+            val speedNumber = parseAsSpeedNumber(speed)
+            val speedMultiplier = parseAsSpeedMultiplier(speed)
             return speedNumber * speedMultiplier
 
         } catch (e: NumberFormatException) {
-            throw SpeedLimitParseException(speed, cause = e)
+            throw SpeedLimitParseException.invalidSpeedFormat(cause = e)
         }
     }
 
-    private fun parseSpeedMultiplier(speed: String): Int {
+    private fun parseAsSpeedMultiplier(speed: String): Int {
         val lastCharacter = speed.last()
         return when {
             lastCharacter.isDigit() -> BYTE_SPEED_MULTIPLIER
             lastCharacter == 'k' -> KILO_BYTE_SPEED_MULTIPLIER
             lastCharacter == 'm' -> MEGA_BYTE_SPEED_MULTIPLIER
-            else -> throw SpeedLimitParseException(speed)
+            else -> throw SpeedLimitParseException.invalidSpeedMultiplier(lastCharacter)
         }
     }
 
-    private fun parseSpeedNumber(speed: String): Double =
+    private fun parseAsSpeedNumber(speed: String): Double =
             if (speed.last().isDigit()) {
                 speed.toDouble()
             } else {
