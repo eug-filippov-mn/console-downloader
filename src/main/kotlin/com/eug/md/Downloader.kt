@@ -4,6 +4,8 @@ import com.eug.md.utils.http.RedirectStrategy
 import com.eug.md.utils.io.BandwidthThrottlingInputStream
 import com.eug.md.utils.io.MultiOutputStream
 import org.apache.http.HttpStatus
+import org.apache.http.client.config.CookieSpecs
+import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.HttpClientBuilder
 import org.slf4j.LoggerFactory
@@ -32,6 +34,7 @@ class Downloader(private val config: DownloaderConfig): Closeable {
                     .create()
                     .setMaxConnTotal(config.maxKeepAliveConnectionTotal)
                     .setMaxConnPerRoute(config.perRouteKeepAliveConnectionLimit)
+                    .setDefaultRequestConfig(RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build())
                     .setRedirectStrategy(RedirectStrategy())
                     .build()
 
@@ -57,7 +60,11 @@ class Downloader(private val config: DownloaderConfig): Closeable {
             }
 
         } catch (e: Exception) {
-            log.error("DownloadTask processing exception", e)
+            if (e is UnexpectedResponseStatusException) {
+                log.warn("DownloadTask processing exception {}", e.message)
+            } else {
+                log.error("DownloadTask processing exception", e)
+            }
 
             val failedResult = FailedResult(downloadTask.number, taskUrl, e)
             log.debug("DownloadTask processing result {}", failedResult)

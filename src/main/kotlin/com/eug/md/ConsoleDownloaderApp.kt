@@ -1,8 +1,9 @@
 package com.eug.md
 
-import com.eug.md.utils.*
-import com.eug.md.utils.concurrent.threadPoolExecutor
-import com.google.common.util.concurrent.MoreExecutors
+import com.eug.md.utils.MeasuredResult
+import com.eug.md.utils.concurrent.BoundedThreadPoolExecutor
+import com.eug.md.utils.joinAll
+import com.eug.md.utils.measureExecTime
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -10,7 +11,8 @@ import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
 import kotlin.system.exitProcess
 
@@ -22,7 +24,7 @@ fun main(args: Array<String>) {
 class ConsoleDownloaderApp private constructor(
         private val settings: Settings,
         private val downloader: Downloader,
-        private val executor: ExecutorService) {
+        private val executor: BoundedThreadPoolExecutor) {
 
     private val out: PrintStream = System.out
     private val scanner: Scanner = Scanner(System.`in`)
@@ -30,6 +32,7 @@ class ConsoleDownloaderApp private constructor(
     companion object {
         private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
         private const val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
+        private const val TASKS_BOUND = 100_000
 
         fun run(args: Array<String>) {
             try {
@@ -43,9 +46,10 @@ class ConsoleDownloaderApp private constructor(
                         maxKeepAliveConnectionTotal = maxOf(MAX_KEEP_ALIVE_CONNECTION_TOTAL, settings.threadsNumber)
                 )
                 val downloader = Downloader(downloaderConfig)
-                val executor = threadPoolExecutor(
+                val executor = BoundedThreadPoolExecutor(
                         numberOfThreads = settings.threadsNumber,
-                        threadsNameFormat = "app-pool thrd-%d"
+                        threadsNameFormat = "app-pool thrd-%d",
+                        bound = TASKS_BOUND
                 )
 
                 val app = ConsoleDownloaderApp(settings, downloader, executor)
@@ -94,13 +98,13 @@ class ConsoleDownloaderApp private constructor(
                 taskCreationResult.tasks
                         .map { downloadTask ->
                             val downloadAction = Supplier { measureExecTime { downloader.download(downloadTask) } }
-                            CompletableFuture.supplyAsync(downloadAction, executor)
+                            return@map CompletableFuture.supplyAsync(downloadAction, executor)
                         }
                         .joinAll()
             }
 
         } finally {
-            MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.MINUTES)
+            executor.shutdownAndAwaitTermination(1, TimeUnit.MINUTES)
         }
     }
 

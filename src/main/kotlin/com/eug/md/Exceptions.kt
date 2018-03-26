@@ -42,5 +42,5 @@ open class LinksFileParseException(msg: String, cause: Throwable? = null) : Cons
     }
 }
 
-class UnexpectedResponseStatusException(status: Int)
-    : ConsoleDownloaderException("Unexpected response status - $status")
+class UnexpectedResponseStatusException(statusCode: Int)
+    : ConsoleDownloaderException("Unexpected response status - $statusCode")
