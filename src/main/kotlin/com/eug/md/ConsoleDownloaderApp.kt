@@ -2,15 +2,13 @@ package com.eug.md
 
 import com.eug.md.utils.MeasuredResult
 import com.eug.md.utils.concurrent.BoundedThreadPoolExecutor
-import com.eug.md.utils.joinAll
+import com.eug.md.utils.concurrent.joinAll
 import com.eug.md.utils.measureExecTime
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
@@ -26,13 +24,12 @@ class ConsoleDownloaderApp private constructor(
         private val downloader: Downloader,
         private val executor: BoundedThreadPoolExecutor) {
 
-    private val out: PrintStream = System.out
-    private val scanner: Scanner = Scanner(System.`in`)
-
     companion object {
-        private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
         private const val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
         private const val TASKS_BOUND = 100_000
+
+        private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
+        private val appIO: AppIO = AppIO(System.`in`, System.out, System.err)
 
         fun run(args: Array<String>) {
             try {
@@ -55,8 +52,8 @@ class ConsoleDownloaderApp private constructor(
                 val app = ConsoleDownloaderApp(settings, downloader, executor)
                 app.run()
             } catch (e: Exception) {
+                appIO.printError(e.message)
                 log.error(e.message, e)
-                System.err.println(e.message)
                 exitProcess(-1)
             }
         }
@@ -73,53 +70,39 @@ class ConsoleDownloaderApp private constructor(
     }
 
     fun run() {
-        log.debug("Start application")
-        log.debug("{}", settings)
-
-        val measuredDownloadingResults = measureExecTime { downloadFiles() }
-
-        log.debug("Downloading results {}", measuredDownloadingResults)
-
-        out.println(ToTableFormatter.format(measuredDownloadingResults))
-    }
-
-    private fun downloadFiles() : List<MeasuredResult<DownloadResult>> {
         try {
-            val taskCreationResult = DownloadTaskFactory.createTasks(settings.linksFilePath)
+            log.debug("Start application")
+            log.debug("{}", settings)
 
-            if (taskCreationResult.invalidRowNumbers.isNotEmpty()) {
-                out.println("Invalid format at rows - ${taskCreationResult.invalidRowNumbers}.")
-                if (!confirmContinue(taskCreationResult)) {
-                    exitProcess(0)
-                }
-            }
+            val measuredDownloadingResults = measureExecTime { downloadFiles() }
 
-            return this.downloader.use { downloader ->
-                taskCreationResult.tasks
-                        .map { downloadTask ->
-                            val downloadAction = Supplier { measureExecTime { downloader.download(downloadTask) } }
-                            return@map CompletableFuture.supplyAsync(downloadAction, executor)
-                        }
-                        .joinAll()
-            }
+            log.debug("Downloading results {}", measuredDownloadingResults)
+            appIO.printResults(measuredDownloadingResults)
 
         } finally {
             executor.shutdownAndAwaitTermination(1, TimeUnit.MINUTES)
         }
     }
 
-    private tailrec fun confirmContinue(tasksCreationResult: TasksCreationResult): Boolean {
-        out.println("${tasksCreationResult.tasks.size} out of ${tasksCreationResult.rowsCount} rows will be processed.")
-        out.println("Continue processing? y/n")
+    private fun downloadFiles() : List<MeasuredResult<DownloadResult>> {
+        val tasksCreationResult = DownloadTaskFactory.createTasks(settings.linksFilePath)
 
-        val confirmLine = scanner.nextLine().trim()
-        return when(confirmLine) {
-            "y","Y" -> true
-            "n","N" -> false
-            else -> {
-                out.println("Invalid input")
-                confirmContinue(tasksCreationResult)
+        if (tasksCreationResult.invalidRowNumbers.isNotEmpty()) {
+            val continueProcessing = appIO.requestContinueConfirmation(tasksCreationResult)
+            if (!continueProcessing) {
+                exitProcess(0)
             }
         }
+
+        return downloader.use {
+            tasksCreationResult.tasks.map { downloadTask -> executeTask(it, downloadTask) }.joinAll()
+        }
+    }
+
+    private fun executeTask(downloader: Downloader, downloadTask: DownloadTask)
+            : CompletableFuture<MeasuredResult<DownloadResult>> {
+
+        val downloadAction = Supplier { measureExecTime { downloader.download(downloadTask) } }
+        return CompletableFuture.supplyAsync(downloadAction, executor)
     }
 }

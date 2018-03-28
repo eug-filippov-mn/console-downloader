@@ -1,4 +1,4 @@
-package com.eug.md.utils
+package com.eug.md.utils.concurrent
 
 import java.util.concurrent.CompletableFuture
 
