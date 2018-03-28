@@ -1,17 +1,10 @@
-group 'console-downloader'
-version '0.1-SNAPSHOT'
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.2.30"
-    }
+plugins {
+    id 'application'
+    id 'org.jetbrains.kotlin.jvm' version '1.2.31'
 }
 
-apply plugin: 'application'
-apply plugin: 'kotlin'
+group 'console-downloader'
+version '0.1-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -22,29 +15,41 @@ test {
 }
 
 ext {
+    kotlinVersion = '1.2.31'
+    guavaVersion = '24.1-jre'
+    httpClientVersion = '4.5.5'
+    commonsCliVersion = '1.4'
+    commonsValidatorVersion = '1.6'
+    asciTableVersion = '0.3.2'
+
+    slf4jVersion = '1.7.25'
+    logbackVersion = '1.2.3'
+
     junitJupiterVersion = '5.1.0'
+    junitExtensionsVersion = '2.1.0'
+    wiremockVersion = '2.15.0'
+    wireMockJunit5Version = '1.1.1'
 }
 
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib:1.2.30"
-    compile 'de.vandermeer:asciitable:0.3.2'
-    compile 'com.google.guava:guava:23.6-jre'
-    compile 'commons-io:commons-io:2.6'
-    compile 'commons-validator:commons-validator:1.6'
-    compile 'org.apache.httpcomponents:httpclient:4.5.5'
-    compile 'commons-cli:commons-cli:1.4'
+    compile "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+    compile "com.google.guava:guava:${guavaVersion}"
+    compile "org.apache.httpcomponents:httpclient:${httpClientVersion}"
+    compile "commons-cli:commons-cli:${commonsCliVersion}"
+    compile "commons-validator:commons-validator:${commonsValidatorVersion}"
+    compile "de.vandermeer:asciitable:${asciTableVersion}"
 
-    compile 'org.slf4j:slf4j-api:1.7.25'
-    compile 'org.slf4j:jcl-over-slf4j:1.7.25'
-    compile 'ch.qos.logback:logback-classic:1.2.3'
-    compile 'ch.qos.logback:logback-core:1.2.3'
+    compile "org.slf4j:slf4j-api:${slf4jVersion}"
+    compile "org.slf4j:jcl-over-slf4j:${slf4jVersion}"
+    compile "ch.qos.logback:logback-classic:${logbackVersion}"
+    compile "ch.qos.logback:logback-core:${logbackVersion}"
 
     testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
 
-    testCompile 'io.github.glytching:junit-extensions:2.0.0'
-    testCompile "com.github.tomakehurst:wiremock:2.14.0"
-    testCompile 'ru.lanwen.wiremock:wiremock-junit5:1.1.1'
+    testCompile "io.github.glytching:junit-extensions:${junitExtensionsVersion}"
+    testCompile "com.github.tomakehurst:wiremock:${wiremockVersion}"
+    testCompile "ru.lanwen.wiremock:wiremock-junit5:${wireMockJunit5Version}"
 }
 
 mainClassName = 'com.eug.md.ConsoleDownloaderAppKt'
