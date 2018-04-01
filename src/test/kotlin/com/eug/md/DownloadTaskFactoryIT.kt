@@ -89,8 +89,7 @@ class DownloadTaskFactoryIT {
             DownloadTaskFactory.createTasks(linksFile.toPath())
         }
 
-        val expectedExceptionMessage = "Invalid links file - \"$linksFile\". Invalid format at rows - [1, 2]. " +
-                "Valid file format is <HTTP link><whitespace><file name>"
+        val expectedExceptionMessage = "Invalid links file - \"$linksFile\". Invalid format at rows - [1, 2]"
         assertEquals(expectedExceptionMessage, exception.message)
     }
 

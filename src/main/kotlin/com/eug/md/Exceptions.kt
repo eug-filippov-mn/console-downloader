@@ -27,8 +27,7 @@ open class LinksFileParseException(msg: String, cause: Throwable? = null) : Cons
     companion object {
 
         fun invalidFormatAtLine(linksFilePath: Path, rowNumbers: List<Int>) =
-                LinksFileParseException("Invalid links file - \"$linksFilePath\". Invalid format at" +
-                        " rows - $rowNumbers. Valid file format is <HTTP link><whitespace><file name>")
+                LinksFileParseException("Invalid links file - \"$linksFilePath\". Invalid format at rows - $rowNumbers")
 
         fun noContent(linksFilePath: Path) =
                 LinksFileParseException("Unable to read links from file \"$linksFilePath\" cause file is empty")

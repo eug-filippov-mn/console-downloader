@@ -2,20 +2,20 @@ package com.eug.md
 
 import com.eug.md.arguments.ArgParser
 import com.eug.md.utils.MeasuredResult
-import com.eug.md.utils.closeSilently
 import com.eug.md.utils.concurrent.BoundedThreadPoolExecutor
 import com.eug.md.utils.concurrent.joinAll
-import com.eug.md.utils.concurrent.shutdownNowAndAwaitTerminationSilently
 import com.eug.md.utils.measureExecTime
+import com.google.common.util.concurrent.MoreExecutors
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionException
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.BiConsumer
 import java.util.function.Supplier
 import kotlin.system.exitProcess
 
@@ -25,88 +25,52 @@ fun main(args: Array<String>) {
 }
 
 class ConsoleDownloaderApp private constructor(
-        private val settings: Settings,
-        private val downloader: Downloader,
-        private val executor: BoundedThreadPoolExecutor) : Closeable  {
+        private val settings: Settings) : Closeable  {
 
-    companion object {
-        private const val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
-        private const val TASKS_BOUND = 100_000
+    private val tasksProgressExecutor: ExecutorService = Executors.newSingleThreadExecutor(
+            ThreadFactoryBuilder().setNameFormat("tasks-progress-thrd").build()
+    )
 
-        private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
-        private val appIO: AppIO = AppIO(System.`in`, System.out, System.err)
+    private val downloadTaskExecutor = BoundedThreadPoolExecutor(
+            numberOfThreads = settings.threadsNumber,
+            threadsNameFormat = "download thrd-%d",
+            bound = TASKS_BOUND
+    )
 
-        fun run(args: Array<String>) {
-            var downloader: Downloader? = null
-            var executor: BoundedThreadPoolExecutor? = null
-
-            try {
-                log.debug("Start arguments parsings")
-                if (ArgParser.containsHelp(args)) {
-                    appIO.printHelp()
-                    exitProcess(0)
-                }
-
-                val settings = Settings.from(ArgParser.parse(args))
-                log.debug("App settings from parsed args {}", settings)
-                createOutDirIfNotExists(settings.outputDirPath)
-
-                log.debug("Starting app's components configuration")
-                val downloaderConfig = DownloaderConfig(
-                        outDirPath = settings.outputDirPath,
-                        speedLimitInBytes = settings.speedLimitInBytes,
-                        perRouteKeepAliveConnectionLimit = settings.threadsNumber,
-                        maxKeepAliveConnectionTotal = maxOf(MAX_KEEP_ALIVE_CONNECTION_TOTAL, settings.threadsNumber)
-                )
-                downloader = Downloader(downloaderConfig)
-                executor = BoundedThreadPoolExecutor(
-                        numberOfThreads = settings.threadsNumber,
-                        threadsNameFormat = "app-pool thrd-%d",
-                        bound = TASKS_BOUND
-                )
-
-                log.debug("Starting application")
-                ConsoleDownloaderApp(settings, downloader, executor).use { it.run() }
-
-            } catch (e: Throwable) {
-                downloader.closeSilently(e)
-                executor.shutdownNowAndAwaitTerminationSilently(1, TimeUnit.SECONDS, e)
-
-                appIO.printError(e.message)
-                log.error(e.message, e)
-                exitProcess(-1)
-            }
-        }
-
-        private fun createOutDirIfNotExists(outDirPath: Path) {
-            try {
-                if (!Files.exists(outDirPath)) {
-                    log.debug("Creating directories for out path")
-                    Files.createDirectories(outDirPath)
-                }
-            } catch (e: IOException) {
-                throw OutDirCreationException(outDirPath, e)
-            }
-        }
-    }
+    private val downloader =
+        Downloader(DownloaderConfig(
+                outDirPath = settings.outputDirPath,
+                speedLimitInBytes = settings.speedLimitInBytes,
+                perRouteKeepAliveConnectionLimit = settings.threadsNumber,
+                maxKeepAliveConnectionTotal = maxOf(MAX_KEEP_ALIVE_CONNECTION_TOTAL, settings.threadsNumber)
+        ))
 
     fun run() {
-        log.debug("Starting downloading")
+        terminal.statusLine("Processing file with links")
+        val tasksCreationResult = DownloadTaskFactory.createTasks(settings.linksFilePath)
+        validateTasksCreationResult(tasksCreationResult)
 
-        //todo add status line
-        val measuredDownloadingResults = measureExecTime { downloadFiles() }
+        terminal.statusLine("Starting downloading")
+        val measuredDownloadingResults = measureExecTime { downloadFiles(tasksCreationResult.tasks) }
 
-        log.debug("Downloading finished. Results {}", measuredDownloadingResults)
-        appIO.printResults(measuredDownloadingResults)
+        terminal.statusLine("Downloading finished")
+        log.debug("Results {}", measuredDownloadingResults)
+        terminal.printResults(measuredDownloadingResults)
     }
 
-    private fun downloadFiles() : List<MeasuredResult<DownloadResult>> {
+    private fun downloadFiles(tasks: List<DownloadTask>): List<MeasuredResult<DownloadResult>> {
         try {
 
-            val tasksCreationResult = DownloadTaskFactory.createTasks(settings.linksFilePath)
-            validateTasksCreationResult(tasksCreationResult)
+            val completedCount = AtomicInteger(0)
 
-            return tasksCreationResult.tasks.map { downloadTask -> executeTask(downloader, downloadTask) }.joinAll()
+            val futures = tasks.map { downloadTask ->
+                executeTask(downloader, downloadTask)
+                        .whenCompleteAsync(BiConsumer { _, _ ->
+                            terminal.statusLine("${completedCount.incrementAndGet()} / ${tasks.size} completed")
+                        }, tasksProgressExecutor)
+            }
+
+            return futures.joinAll()
 
         } catch (e: CompletionException) {
             e.cause?.let { throw  it}
@@ -118,11 +82,11 @@ class ConsoleDownloaderApp private constructor(
         val invalidRowNumbers = tasksCreationResult.invalidRowNumbers
         if (invalidRowNumbers.isNotEmpty()) {
             if (settings.interactiveMode) {
-                val continueProcessing = appIO.requestContinueConfirmation(tasksCreationResult)
+                val continueProcessing = terminal.requestContinueConfirmation(tasksCreationResult)
                 if (!continueProcessing) {
                     exitProcess(0)
                 }
-            } else{
+            } else {
                 throw LinksFileParseException.invalidFormatAtLine(settings.linksFilePath, invalidRowNumbers)
             }
         }
@@ -132,13 +96,59 @@ class ConsoleDownloaderApp private constructor(
             : CompletableFuture<MeasuredResult<DownloadResult>> {
 
         val downloadAction = Supplier { measureExecTime { downloader.download(downloadTask) } }
-        return CompletableFuture.supplyAsync(downloadAction, executor)
+        return CompletableFuture.supplyAsync(downloadAction, downloadTaskExecutor)
     }
 
     override fun close() {
         log.debug("Closing app")
-        executor.shutdownAndAwaitTermination(10, TimeUnit.SECONDS)
+
+        downloadTaskExecutor.shutdownAndAwaitTermination(10, TimeUnit.SECONDS)
+        MoreExecutors.shutdownAndAwaitTermination(tasksProgressExecutor, 5, TimeUnit.SECONDS)
         downloader.close()
+
         log.debug("App closed")
+    }
+
+    companion object {
+        private const val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
+        private const val TASKS_BOUND = 100_000
+
+        private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
+
+        private val terminal: Terminal = Terminal()
+
+        fun run(args: Array<String>) {
+            try {
+
+                if (ArgParser.containsHelp(args)) {
+                    terminal.printHelp()
+                    exitProcess(0)
+                }
+
+                terminal.statusLine("Start arguments parsings")
+                val settings = Settings.from(ArgParser.parse(args))
+                log.debug("App settings from parsed args {}", settings)
+                createOutDirIfNotExists(settings.outputDirPath)
+
+                terminal.statusLine("Starting application")
+                ConsoleDownloaderApp(settings).use { it.run() }
+
+            } catch (e: Throwable) {
+                terminal.printError(e.message)
+                log.error(e.message, e)
+                exitProcess(-1)
+            }
+        }
+
+        private fun createOutDirIfNotExists(outDirPath: Path) {
+            try {
+                if (!Files.exists(outDirPath)) {
+                    terminal.statusLine("Creating directories for out path")
+                    Files.createDirectories(outDirPath)
+                }
+            } catch (e: IOException) {
+                throw OutDirCreationException(outDirPath, e)
+            }
+        }
     }
 }

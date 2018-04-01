@@ -16,7 +16,7 @@ object Opts {
             Option.builder("f")
                     .longOpt("links-file-path")
                     .argName("LINKS_FILE_PATH")
-                    .desc("Path to file with links list")
+                    .desc("Path to file with links list. Valid file format is <HTTP link><whitespace><file name>")
                     .hasArg()
                     .required()
                     .build()

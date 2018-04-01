@@ -6,19 +6,25 @@ import com.eug.md.utils.format.*
 import de.vandermeer.asciitable.AsciiTable
 import de.vandermeer.skb.interfaces.transformers.textformat.TextAlignment
 import org.apache.commons.cli.HelpFormatter
-import java.io.InputStream
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.io.PrintStream
 import java.util.*
 
-class AppIO(
-        `in`: InputStream,
-        private val out: PrintStream,
-        private val err: PrintStream) {
 
-    private val scanner  = Scanner(`in`)
+class Terminal {
+
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(Terminal::class.java)
+    }
+
+    private val scanner  = Scanner(System.`in`)
+    private val out: PrintStream = System.out
+    private val err: PrintStream = System.err
     private val helpFormatter = HelpFormatter()
 
     fun requestContinueConfirmation(tasksCreationResult: TasksCreationResult): Boolean {
+        out.print("\r")
         out.println("Invalid format at rows - ${tasksCreationResult.invalidRowNumbers}.")
         out.println("${tasksCreationResult.tasks.size} out of ${tasksCreationResult.rowsCount} rows will be processed.")
         return processUserInput(tasksCreationResult)
@@ -38,7 +44,16 @@ class AppIO(
         }
     }
 
+    fun statusLine(message: String) {
+        out.print("\r")
+        out.print("> ")
+        out.print(message)
+
+        log.debug(message)
+    }
+
     fun printResults(results: MeasuredResult<List<MeasuredResult<DownloadResult>>>) {
+        out.print("\r")
         out.println(ToTableFormatter.format(results))
     }
 
@@ -47,6 +62,7 @@ class AppIO(
     }
 
     fun printError(message: String?) {
+        err.print("\r")
         err.println(message ?: "Unexpected error")
     }
 
