@@ -1,7 +1,7 @@
 <configuration>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>app.log</file>
+        <file>${user.home}/console-downloader.log</file>
         <append>false</append>
         <encoder>
             <pattern>
@@ -10,22 +10,13 @@
         </encoder>
     </appender>
 
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>
-                %d{HH:mm:ss.SSS} %magenta([%thread]) %yellow(uuid=%X{uuid}) %highlight(%-5level) %cyan(%logger{36}) - %msg%n
-            </pattern>
-        </encoder>
-    </appender>
+    <logger name="org.apache.http.impl.conn" level="info"/>
+    <logger name="org.apache.http.impl.client" level="info"/>
+    <logger name="com.eug.md" level="info"/>
 
-    <logger name="org.apache.http.impl.conn" level="warn"/>
-    <logger name="org.apache.http.impl.client" level="warn"/>
-    <logger name="com.eug.md" level="warn"/>
-
-    <root level="warn">
-        <appender-ref ref="STDOUT"/>
+    <root level="info">
         <appender-ref ref="FILE"/>
     </root>
 
-    <shutdownHook/>
+    <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook"/>
 </configuration>

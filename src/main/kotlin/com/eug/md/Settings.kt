@@ -1,76 +1,29 @@
 package com.eug.md
 
-import org.apache.commons.cli.*
+import com.eug.md.arguments.Opts
+import com.eug.md.utils.getOptionValue
+import com.eug.md.utils.hasOption
+import org.apache.commons.cli.CommandLine
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
-object Opts {
-    val threadsNumber: Option =
-            Option.builder("n")
-                    .longOpt("threads-number")
-                    .argName("THREADS_NUMBER")
-                    .desc("Number of threads for concurrent downloading")
-                    .hasArg()
-                    .required()
-                    .build()
-
-    val linksFilePath: Option =
-            Option.builder("f")
-                    .longOpt("links-file-path")
-                    .argName("LINKS_FILE_PATH")
-                    .desc("Path to file with links list")
-                    .hasArg()
-                    .required()
-                    .build()
-
-    val outputDirPath: Option =
-            Option.builder("o")
-                    .longOpt("--output-dir-path")
-                    .argName("OUTPUT_DIR_PATH")
-                    .desc("Path to dir for downloaded files")
-                    .hasArg()
-                    .required()
-                    .build()
-
-    val speedLimit: Option =
-            Option.builder("l")
-                    .longOpt("speed-limit")
-                    .argName("SPEED_LIMIT")
-                    .desc("Speed limit for all threads")
-                    .hasArg()
-                    .required()
-                    .build()
-
-    fun all(): Options  =
-            Options()
-                    .addOption(threadsNumber)
-                    .addOption(linksFilePath)
-                    .addOption(outputDirPath)
-                    .addOption(speedLimit)
-}
 
 data class Settings(
         val threadsNumber: Int,
         val linksFilePath: Path,
         val outputDirPath: Path,
-        val speedLimitInBytes: Double) {
+        val speedLimitInBytes: Double,
+        val interactiveMode: Boolean) {
 
     companion object {
 
-        fun from(args: Array<String>): Settings {
-            val commandLine: CommandLine
-            try {
-                commandLine = DefaultParser().parse(Opts.all(), args)
-            } catch (e: ParseException) {
-                throw NotValidOptionsException(e.message ?: "Options parse error", e)
-            }
-
+        fun from(commandLine: CommandLine): Settings {
             return Settings(
-                    threadsNumber = parseThreadNumber(commandLine.getOptionValue(Opts.threadsNumber.opt)),
-                    linksFilePath = parseLinksFilePath(commandLine.getOptionValue(Opts.linksFilePath.opt)),
-                    outputDirPath = parseOutputDirPath(commandLine.getOptionValue(Opts.outputDirPath.opt)),
-                    speedLimitInBytes = parseSpeedLimit(commandLine.getOptionValue(Opts.speedLimit.opt))
+                    threadsNumber = parseThreadNumber(commandLine.getOptionValue(Opts.threadsNumber)),
+                    linksFilePath = parseLinksFilePath(commandLine.getOptionValue(Opts.linksFilePath)),
+                    outputDirPath = parseOutputDirPath(commandLine.getOptionValue(Opts.outputDirPath)),
+                    speedLimitInBytes = parseSpeedLimit(commandLine.getOptionValue(Opts.speedLimit)),
+                    interactiveMode = commandLine.hasOption(Opts.interactiveMode)
             )
         }
 

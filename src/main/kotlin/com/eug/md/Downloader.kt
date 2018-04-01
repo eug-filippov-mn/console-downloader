@@ -43,7 +43,7 @@ class Downloader(private val config: DownloaderConfig): Closeable {
 
         try {
             MDC.put("uuid", UUID.randomUUID().toString())
-            log.debug("Start processing downloadTask {}", downloadTask)
+            log.debug("Start processing download task {}", downloadTask)
 
             val httpGet = HttpGet(taskUrl)
 
@@ -55,19 +55,19 @@ class Downloader(private val config: DownloaderConfig): Closeable {
                 val savedBytesCount = download(response.entity.content, downloadTask.fileNames)
                 val successResult = SuccessResult(downloadTask.number, taskUrl, savedBytesCount)
 
-                log.debug("DownloadTask processing result {}", successResult)
+                log.debug("Download task processing result {}", successResult)
                 return successResult
             }
 
         } catch (e: Exception) {
-            if (e is UnexpectedResponseStatusException) {
-                log.warn("DownloadTask processing exception {}", e.message)
-            } else {
-                log.error("DownloadTask processing exception", e)
+            when(e) {
+                is UnexpectedResponseStatusException -> log.warn("Download task processing exception {}", e.message)
+                is InterruptedException -> Thread.currentThread().interrupt()
+                else -> log.error("Download task processing exception", e)
             }
 
             val failedResult = FailedResult(downloadTask.number, taskUrl, e)
-            log.debug("DownloadTask processing result {}", failedResult)
+            log.debug("Download task processing result {}", failedResult)
             return failedResult
         } finally {
             MDC.clear()
@@ -93,7 +93,9 @@ class Downloader(private val config: DownloaderConfig): Closeable {
     }
 
     override fun close() {
+        log.debug("Closing downloader")
         httpClient.close()
+        log.debug("Downloader closed")
     }
 }
 

@@ -1,7 +1,7 @@
 <configuration>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>build/test-results/test/app.log</file>
+        <file>app.log</file>
         <append>false</append>
         <encoder>
             <pattern>
@@ -12,16 +12,19 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %magenta([%thread]) %highlight(%-5level) %cyan(%logger{36}) - %msg%n</pattern>
+            <pattern>
+                %d{HH:mm:ss.SSS} %magenta([%thread]) %yellow(uuid=%X{uuid}) %highlight(%-5level) %cyan(%logger{36}) - %msg%n
+            </pattern>
         </encoder>
     </appender>
 
-    <logger name="org.apache.http.impl.conn" level="debug"/>
-    <logger name="org.apache.http.impl.client" level="debug"/>
+    <logger name="org.apache.http.impl.conn" level="info"/>
+    <logger name="org.apache.http.impl.client" level="info"/>
     <logger name="com.eug.md" level="debug"/>
 
     <root level="info">
         <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
     </root>
 
     <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook"/>

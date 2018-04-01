@@ -1,5 +1,6 @@
 package com.eug.md
 
+import com.eug.md.arguments.Opts
 import com.eug.md.utils.MeasuredResult
 import com.eug.md.utils.format.*
 import de.vandermeer.asciitable.AsciiTable
@@ -42,12 +43,11 @@ class AppIO(
     }
 
     fun printHelp() {
-        helpFormatter.printHelp("clSyntax?", Opts.all())
+        helpFormatter.printHelp("console-downloader [OPTION]...", Opts.all())
     }
 
     fun printError(message: String?) {
-        err.println(message)
-        printHelp()
+        err.println(message ?: "Unexpected error")
     }
 
     private object ToTableFormatter {
@@ -67,6 +67,7 @@ class AppIO(
                             Column(measuredResult.executionTime)
                     )
                 })
+                //todo add number format
                 addTotal(
                         Column("Total downloaded bytes", colspan = 3),
                         Column(toTotalDownloadedBytesSize(downloadMeasuredResults), colspan = 2)
