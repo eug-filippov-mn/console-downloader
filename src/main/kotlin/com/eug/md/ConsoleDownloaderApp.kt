@@ -1,22 +1,17 @@
 package com.eug.md
 
 import com.eug.md.arguments.ArgParser
+import com.eug.md.settings.Settings
 import com.eug.md.utils.MeasuredResult
-import com.eug.md.utils.concurrent.BoundedThreadPoolExecutor
-import com.eug.md.utils.concurrent.joinAll
 import com.eug.md.utils.measureExecTime
-import com.google.common.util.concurrent.MoreExecutors
-import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.google.common.base.StandardSystemProperty
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.*
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.function.BiConsumer
-import java.util.function.Supplier
+import java.nio.file.Paths
 import kotlin.system.exitProcess
 
 
@@ -24,26 +19,8 @@ fun main(args: Array<String>) {
     ConsoleDownloaderApp.run(args)
 }
 
-class ConsoleDownloaderApp private constructor(
-        private val settings: Settings) : Closeable  {
-
-    private val tasksProgressExecutor: ExecutorService = Executors.newSingleThreadExecutor(
-            ThreadFactoryBuilder().setNameFormat("tasks-progress-thrd").build()
-    )
-
-    private val downloadTaskExecutor = BoundedThreadPoolExecutor(
-            numberOfThreads = settings.threadsNumber,
-            threadsNameFormat = "download thrd-%d",
-            bound = TASKS_BOUND
-    )
-
-    private val downloader =
-        Downloader(DownloaderConfig(
-                outDirPath = settings.outputDirPath,
-                speedLimitInBytes = settings.speedLimitInBytes,
-                perRouteKeepAliveConnectionLimit = settings.threadsNumber,
-                maxKeepAliveConnectionTotal = maxOf(MAX_KEEP_ALIVE_CONNECTION_TOTAL, settings.threadsNumber)
-        ))
+class ConsoleDownloaderApp private constructor(private val settings: Settings) : Closeable  {
+    private val tasksLauncher = TasksLauncher(settings)
 
     fun run() {
         terminal.statusLine("Processing file with links")
@@ -59,59 +36,51 @@ class ConsoleDownloaderApp private constructor(
     }
 
     private fun downloadFiles(tasks: List<DownloadTask>): List<MeasuredResult<DownloadResult>> {
-        try {
+        tasksLauncher.start(tasks)
 
-            val completedCount = AtomicInteger(0)
+        val completedTasks = mutableListOf<MeasuredResult<DownloadResult>>()
+        var completedTasksCount = 0
 
-            val futures = tasks.map { downloadTask ->
-                executeTask(downloader, downloadTask)
-                        .whenCompleteAsync(BiConsumer { _, _ ->
-                            terminal.statusLine("${completedCount.incrementAndGet()} / ${tasks.size} completed")
-                        }, tasksProgressExecutor)
-            }
+        while (completedTasksCount != tasks.size && !tasksLauncher.stopped) {
+            val measuredTaskResult = tasksLauncher.takeNextCompleted()
+            completedTasks.add(measuredTaskResult)
 
-            return futures.joinAll()
-
-        } catch (e: CompletionException) {
-            e.cause?.let { throw  it}
-            throw e
+            completedTasksCount++
+            terminal.statusLine("$completedTasksCount / ${tasks.size} downloads completed")
         }
+        return completedTasks
     }
 
     private fun validateTasksCreationResult(tasksCreationResult: TasksCreationResult) {
-        val invalidRowNumbers = tasksCreationResult.invalidRowNumbers
-        if (invalidRowNumbers.isNotEmpty()) {
+        if (tasksCreationResult.invalidRowNumbers.isNotEmpty()) {
             if (settings.interactiveMode) {
-                val continueProcessing = terminal.requestContinueConfirmation(tasksCreationResult)
+                printInvalidRowsMessage(settings.linksFilePath, tasksCreationResult)
+
+                val continueProcessing = terminal.yesNoDialog(
+                        dialogMessage = "Continue processing?", yesAnswer = "y", noAnswer = "n"
+                )
+
                 if (!continueProcessing) {
                     exitProcess(0)
                 }
             } else {
-                throw LinksFileParseException.invalidFormatAtLine(settings.linksFilePath, invalidRowNumbers)
+                throw InvalidLinksFileFormat(settings.linksFilePath, tasksCreationResult.invalidRowNumbers)
             }
         }
     }
 
-    private fun executeTask(downloader: Downloader, downloadTask: DownloadTask)
-            : CompletableFuture<MeasuredResult<DownloadResult>> {
-
-        val downloadAction = Supplier { measureExecTime { downloader.download(downloadTask) } }
-        return CompletableFuture.supplyAsync(downloadAction, downloadTaskExecutor)
-    }
-
     override fun close() {
         log.debug("Closing app")
-
-        downloadTaskExecutor.shutdownAndAwaitTermination(10, TimeUnit.SECONDS)
-        MoreExecutors.shutdownAndAwaitTermination(tasksProgressExecutor, 5, TimeUnit.SECONDS)
-        downloader.close()
-
+        tasksLauncher.stop()
         log.debug("App closed")
     }
 
     companion object {
-        private const val MAX_KEEP_ALIVE_CONNECTION_TOTAL = 50
-        private const val TASKS_BOUND = 100_000
+        private const val INVALID_ROW_NUMBERS_LIMIT_TO_PRINT_TO_TERMINAL = 100
+
+        private val INVALID_ROW_NUMBERS_FILE_PATH =
+                Paths.get(StandardSystemProperty.USER_HOME.value())
+                        .resolve("console-downloader.invalid-rows-report")
 
         private val log: Logger = LoggerFactory.getLogger(ConsoleDownloaderApp::class.java)
 
@@ -125,9 +94,11 @@ class ConsoleDownloaderApp private constructor(
                     exitProcess(0)
                 }
 
-                terminal.statusLine("Start arguments parsings")
-                val settings = Settings.from(ArgParser.parse(args))
+                terminal.statusLine("Parsings arguments")
+                val commandLine = ArgParser.parse(args)
+                val settings = Settings.from(commandLine)
                 log.debug("App settings from parsed args {}", settings)
+
                 createOutDirIfNotExists(settings.outputDirPath)
 
                 terminal.statusLine("Starting application")
@@ -149,6 +120,41 @@ class ConsoleDownloaderApp private constructor(
             } catch (e: IOException) {
                 throw OutDirCreationException(outDirPath, e)
             }
+        }
+
+        private fun printInvalidRowsMessage(linksFilePath: Path, tasksCreationResult: TasksCreationResult) {
+            val (tasks, invalidRowNumbers, rowsCount) = tasksCreationResult
+
+            var rowsWrittenToFile = false
+            if (invalidRowNumbers.size > INVALID_ROW_NUMBERS_LIMIT_TO_PRINT_TO_TERMINAL) {
+                rowsWrittenToFile = writeInvalidRowsToFile(invalidRowNumbers)
+            }
+
+            if (rowsWrittenToFile) {
+                terminal.message(
+                        """Invalid links file - "$linksFilePath"
+                            |${invalidRowNumbers.size} invalid rows detected
+                            |Invalid rows' numbers saved to $INVALID_ROW_NUMBERS_FILE_PATH
+                            |""".trimMargin()
+                )
+            } else {
+                terminal.message("Invalid links file - \"$linksFilePath\". Invalid format at rows - $invalidRowNumbers")
+            }
+
+            terminal.message("${tasks.size} out of $rowsCount rows will be processed.")
+        }
+
+        private fun writeInvalidRowsToFile(invalidRowNumbers: List<Int>): Boolean {
+            var rowsWrittenToFile = false
+            try {
+                val fileContent = invalidRowNumbers.joinToString(",")
+                INVALID_ROW_NUMBERS_FILE_PATH.toFile().writeText(fileContent)
+                rowsWrittenToFile = true
+            } catch (e: IOException) {
+                log.debug("Exception while writing invalid rows to file", e)
+            }
+
+            return rowsWrittenToFile
         }
     }
 }

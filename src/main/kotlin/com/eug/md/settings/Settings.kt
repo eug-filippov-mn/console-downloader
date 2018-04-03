@@ -1,5 +1,7 @@
-package com.eug.md
+package com.eug.md.settings
 
+import com.eug.md.NotValidOptionsException
+import com.eug.md.SpeedLimitParseException
 import com.eug.md.arguments.Opts
 import com.eug.md.utils.getOptionValue
 import com.eug.md.utils.hasOption

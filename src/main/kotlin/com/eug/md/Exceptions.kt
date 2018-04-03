@@ -26,9 +26,6 @@ class OutDirCreationException(outDirPath: Path, cause: Throwable)
 open class LinksFileParseException(msg: String, cause: Throwable? = null) : ConsoleDownloaderException(msg, cause) {
     companion object {
 
-        fun invalidFormatAtLine(linksFilePath: Path, rowNumbers: List<Int>) =
-                LinksFileParseException("Invalid links file - \"$linksFilePath\". Invalid format at rows - $rowNumbers")
-
         fun noContent(linksFilePath: Path) =
                 LinksFileParseException("Unable to read links from file \"$linksFilePath\" cause file is empty")
 
@@ -40,6 +37,9 @@ open class LinksFileParseException(msg: String, cause: Throwable? = null) : Cons
                         "Unable to read links from file \"$linksFilePath\" cause access is denied", cause)
     }
 }
+
+class InvalidLinksFileFormat(val linksFilePath: Path, val rowNumbers: List<Int>) :
+        LinksFileParseException("Invalid links file - \"$linksFilePath\". Invalid format at rows - $rowNumbers")
 
 class UnexpectedResponseStatusException(statusCode: Int)
     : ConsoleDownloaderException("Unexpected response status - $statusCode")

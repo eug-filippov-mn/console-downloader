@@ -1,4 +1,6 @@
-package com.eug.md
+package com.eug.md.settings
+
+import com.eug.md.SpeedLimitParseException
 
 object SpeedLimitParser {
     private const val BYTE_SPEED_MULTIPLIER = 1

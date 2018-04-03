@@ -1,6 +1,7 @@
 package com.eug.md
 
 import com.eug.md.arguments.ArgParser
+import com.eug.md.settings.Settings
 import io.github.glytching.junit.extension.folder.TemporaryFolder
 import io.github.glytching.junit.extension.folder.TemporaryFolderExtension
 import org.junit.jupiter.api.Assertions

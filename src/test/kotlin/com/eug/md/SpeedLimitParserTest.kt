@@ -1,5 +1,6 @@
 package com.eug.md
 
+import com.eug.md.settings.SpeedLimitParser
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test

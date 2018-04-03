@@ -23,23 +23,16 @@ class Terminal {
     private val err: PrintStream = System.err
     private val helpFormatter = HelpFormatter()
 
-    fun requestContinueConfirmation(tasksCreationResult: TasksCreationResult): Boolean {
-        out.print("\r")
-        out.println("Invalid format at rows - ${tasksCreationResult.invalidRowNumbers}.")
-        out.println("${tasksCreationResult.tasks.size} out of ${tasksCreationResult.rowsCount} rows will be processed.")
-        return processUserInput(tasksCreationResult)
-    }
+    tailrec fun yesNoDialog(dialogMessage: String, yesAnswer: String, noAnswer: String): Boolean {
+        message("$dialogMessage $yesAnswer/$noAnswer")
 
-    private tailrec fun processUserInput(tasksCreationResult: TasksCreationResult): Boolean {
-        out.println("Continue processing? y/n")
-
-        val confirmLine = scanner.nextLine().trim()
+        val confirmLine = scanner.nextLine().trim().toLowerCase()
         return when(confirmLine) {
-            "y","Y" -> true
-            "n","N" -> false
+            yesAnswer.toLowerCase() -> true
+            noAnswer.toLowerCase() -> false
             else -> {
-                out.println("Invalid input")
-                processUserInput(tasksCreationResult)
+                message("Invalid input")
+                yesNoDialog(dialogMessage, yesAnswer, noAnswer)
             }
         }
     }
@@ -64,6 +57,11 @@ class Terminal {
     fun printError(message: String?) {
         err.print("\r")
         err.println(message ?: "Unexpected error")
+    }
+
+    fun message(message: String) {
+        out.print("\r")
+        out.println(message)
     }
 
     private object ToTableFormatter {
