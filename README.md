@@ -10,7 +10,7 @@
 ```
 
 #### Usage 
-Run from build directory
+Run from project directory
 ```
 java -jar build/libs/console-downloader-0.1-SNAPSHOT.jar [OPTION]...
 ```
