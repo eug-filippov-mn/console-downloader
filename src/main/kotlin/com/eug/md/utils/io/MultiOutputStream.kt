@@ -1,8 +1,9 @@
 package com.eug.md.utils.io
 
+import java.io.InputStream
 import java.io.OutputStream
 
-class MultiOutputStream(private val outputStreams: List<OutputStream>) : OutputStream() {
+class MultiOutputStream(private val outputStreams: Collection<OutputStream>) : OutputStream() {
 
     override fun write(byte: Int) {
         outputStreams.forEach { it.write(byte) }
@@ -23,4 +24,14 @@ class MultiOutputStream(private val outputStreams: List<OutputStream>) : OutputS
     override fun close() {
         outputStreams.forEach { it.close() }
     }
+
+    fun drainFrom(inputStream: InputStream): Long {
+        return use { multiOutputStream ->
+            inputStream.use {
+                it.copyTo(multiOutputStream)
+            }
+        }
+    }
 }
+
+fun Collection<OutputStream>.toMultioutputStream(): MultiOutputStream = MultiOutputStream(this)

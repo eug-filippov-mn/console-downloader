@@ -13,11 +13,6 @@ import java.util.*
 
 
 class Terminal {
-
-    companion object {
-        private val log: Logger = LoggerFactory.getLogger(Terminal::class.java)
-    }
-
     private val scanner  = Scanner(System.`in`)
     private val out: PrintStream = System.out
     private val err: PrintStream = System.err
@@ -38,11 +33,13 @@ class Terminal {
     }
 
     fun statusLine(message: String) {
-        out.print("\r")
-        out.print("> ")
-        out.print(message)
-
-        log.debug(message)
+        if (log.isDebugEnabled) {
+            log.debug(message)
+        } else {
+            out.print("\r")
+            out.print("> ")
+            out.print(message)
+        }
     }
 
     fun printResults(results: MeasuredResult<List<MeasuredResult<DownloadResult>>>) {
@@ -55,13 +52,23 @@ class Terminal {
     }
 
     fun printError(message: String?) {
-        err.print("\r")
-        err.println(message ?: "Unexpected error")
+        val messageToPrint = message ?: "Unexpected error"
+
+        if (log.isDebugEnabled) {
+            log.debug(messageToPrint)
+        } else {
+            err.print("\r")
+            err.println(messageToPrint)
+        }
     }
 
     fun message(message: String) {
-        out.print("\r")
-        out.println(message)
+        if (log.isDebugEnabled) {
+            log.debug(message)
+        } else {
+            out.print("\r")
+            out.println(message)
+        }
     }
 
     private object ToTableFormatter {
@@ -111,5 +118,9 @@ class Terminal {
         private fun toTotalDownloadedBytesSize(downloadMeasuredResults: List<MeasuredResult<DownloadResult>>) =
             downloadMeasuredResults.map { it -> it.result.savedBytesCount }.sum()
 
+    }
+
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(Terminal::class.java)
     }
 }

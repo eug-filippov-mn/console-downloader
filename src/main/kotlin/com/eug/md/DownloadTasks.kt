@@ -9,7 +9,6 @@ import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.util.*
-import java.util.concurrent.TimeUnit
 
 
 data class DownloadTask(val number: Int, val url: String, val fileNames: List<String>)
@@ -62,7 +61,7 @@ object DownloadTaskFactory {
                 rowsCount++
                 val lineTokens = line.split(DEFAULT_DELIMITER, limit = 2)
                 if (isLineTokensNotValid(lineTokens)) {
-                    invalidRowNumbers.add(index + 1)
+                    invalidRowNumbers += (index + 1)
                     return@forEachIndexed
                 }
 

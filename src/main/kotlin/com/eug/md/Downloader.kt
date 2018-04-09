@@ -1,12 +1,16 @@
 package com.eug.md
 
-import com.eug.md.utils.http.RedirectStrategy
+import com.eug.md.utils.LimitedKeepAliveStrategy
+import com.eug.md.utils.PermanentRedirectSupportRedirectStrategy
 import com.eug.md.utils.io.BandwidthThrottlingInputStream
-import com.eug.md.utils.io.MultiOutputStream
+import com.eug.md.utils.io.toMultioutputStream
+import org.apache.http.HttpResponse
 import org.apache.http.HttpStatus
+import org.apache.http.client.ResponseHandler
 import org.apache.http.client.config.CookieSpecs
 import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.HttpGet
+import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClientBuilder
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
@@ -25,18 +29,7 @@ data class DownloaderConfig(
 
 class Downloader(private val config: DownloaderConfig): Closeable {
 
-    companion object {
-        private val log = LoggerFactory.getLogger(Downloader::class.java)
-    }
-
-    private val httpClient =
-            HttpClientBuilder
-                    .create()
-                    .setMaxConnTotal(config.maxKeepAliveConnectionTotal)
-                    .setMaxConnPerRoute(config.perRouteKeepAliveConnectionLimit)
-                    .setDefaultRequestConfig(RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build())
-                    .setRedirectStrategy(RedirectStrategy())
-                    .build()
+    private val httpClient = buildHttpClient(config)
 
     fun download(downloadTask: DownloadTask): DownloadResult {
         val taskUrl = downloadTask.url
@@ -45,19 +38,8 @@ class Downloader(private val config: DownloaderConfig): Closeable {
             MDC.put("uuid", UUID.randomUUID().toString())
             log.debug("Start processing download task {}", downloadTask)
 
-            val httpGet = HttpGet(taskUrl)
-
-            httpClient.execute(httpGet).use { response ->
-                val statusLine = response.statusLine
-                if (statusLine.statusCode != HttpStatus.SC_OK) {
-                    throw UnexpectedResponseStatusException(statusLine.statusCode)
-                }
-                val savedBytesCount = download(response.entity.content, downloadTask.fileNames)
-                val successResult = SuccessResult(downloadTask.number, taskUrl, savedBytesCount)
-
-                log.debug("Download task processing result {}", successResult)
-                return successResult
-            }
+            log.debug("Executing request for url {}", taskUrl)
+            return httpClient.execute(HttpGet(taskUrl), HttpResponseHandler(downloadTask))
 
         } catch (e: Exception) {
             when(e) {
@@ -74,28 +56,75 @@ class Downloader(private val config: DownloaderConfig): Closeable {
         }
     }
 
-    private fun download(connectionInputStream: InputStream, fileNames: List<String>): Long {
-        val bandwidthThrottlingInputStream =
-                BandwidthThrottlingInputStream(connectionInputStream.buffered(), config.speedLimitInBytes)
+    private inner class HttpResponseHandler(private val downloadTask: DownloadTask) : ResponseHandler<DownloadResult> {
 
-        val outputFilePaths = fileNames.map(config.outDirPath::resolve)
-        outputFilePaths.map(Path::getParent).forEach { parentPath ->
-            if (!Files.exists(parentPath)) {
-                log.debug("Creating directories for path {}", parentPath)
-                Files.createDirectories(parentPath)
+        override fun handleResponse(response: HttpResponse): DownloadResult {
+            log.debug("Receive response")
+            val statusCode = response.statusLine.statusCode
+            if (statusCode != HttpStatus.SC_OK) {
+                throw UnexpectedResponseStatusException(statusCode)
+            }
+
+            log.debug("Starting download content")
+            val savedBytesCount = download(response.entity.content, downloadTask.fileNames)
+            val successResult = SuccessResult(downloadTask.number, downloadTask.url, savedBytesCount)
+
+            log.debug("Download task processing result {}", successResult)
+            return successResult
+        }
+
+        private fun download(connectionInputStream: InputStream, fileNames: List<String>): Long {
+            val outputFilePaths = fileNames.map(config.outDirPath::resolve)
+            createDirectoriesIfNotExist(outputFilePaths)
+
+            val multiOutputStream =
+                    outputFilePaths
+                            .map { path -> Files.newOutputStream(path, StandardOpenOption.CREATE).buffered() }
+                            .toMultioutputStream()
+
+            val bandwidthThrottlingInputStream =
+                    BandwidthThrottlingInputStream(connectionInputStream.buffered(), config.speedLimitInBytes)
+
+            return multiOutputStream.drainFrom(bandwidthThrottlingInputStream)
+        }
+
+        private fun createDirectoriesIfNotExist(outputFilePaths: Collection<Path>) {
+            outputFilePaths.map(Path::getParent).forEach { parentPath ->
+                if (!Files.exists(parentPath)) {
+                    log.debug("Creating directories for path {}", parentPath)
+                    Files.createDirectories(parentPath)
+                }
             }
         }
-
-        val outputStreams = outputFilePaths.map { path ->
-            Files.newOutputStream(path, StandardOpenOption.CREATE).buffered()
-        }
-        return MultiOutputStream(outputStreams).use { bandwidthThrottlingInputStream.copyTo(it) }
     }
 
     override fun close() {
         log.debug("Closing downloader")
         httpClient.close()
         log.debug("Downloader closed")
+    }
+
+    companion object {
+        private val log = LoggerFactory.getLogger(Downloader::class.java)
+
+        private fun buildHttpClient(config: DownloaderConfig): CloseableHttpClient {
+            val requestConfig =
+                    RequestConfig.custom()
+                            .setCookieSpec(CookieSpecs.STANDARD)
+                            .setConnectionRequestTimeout(120_000)
+                            .setConnectTimeout(60_000)
+                            .setSocketTimeout(60_000)
+                            .build()
+
+            return HttpClientBuilder.create()
+                    .setMaxConnTotal(config.maxKeepAliveConnectionTotal)
+                    .setMaxConnPerRoute(config.perRouteKeepAliveConnectionLimit)
+                    .setDefaultRequestConfig(requestConfig)
+                    .setRedirectStrategy(PermanentRedirectSupportRedirectStrategy())
+                    .setKeepAliveStrategy(LimitedKeepAliveStrategy(defaultKeepAliveMills = 120_000))
+                    .evictExpiredConnections()
+                    .build()
+        }
     }
 }
 

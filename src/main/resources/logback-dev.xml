@@ -18,8 +18,9 @@
         </encoder>
     </appender>
 
-    <logger name="org.apache.http.impl.conn" level="info"/>
-    <logger name="org.apache.http.impl.client" level="info"/>
+    <logger name="org.apache.http.impl.conn" level="debug"/>
+    <logger name="org.apache.http.impl.execchain" level="debug"/>
+    <logger name="org.apache.http.impl.client" level="debug"/>
     <logger name="com.eug.md" level="debug"/>
 
     <root level="info">

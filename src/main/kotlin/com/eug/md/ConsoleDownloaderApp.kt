@@ -31,19 +31,17 @@ class ConsoleDownloaderApp private constructor(private val settings: Settings) :
         val measuredDownloadingResults = measureExecTime { downloadFiles(tasksCreationResult.tasks) }
 
         terminal.statusLine("Downloading finished")
-        log.debug("Results {}", measuredDownloadingResults)
         terminal.printResults(measuredDownloadingResults)
     }
 
     private fun downloadFiles(tasks: List<DownloadTask>): List<MeasuredResult<DownloadResult>> {
-        tasksLauncher.start(tasks)
+        tasksLauncher.startDownloading(tasks)
 
         val completedTasks = mutableListOf<MeasuredResult<DownloadResult>>()
         var completedTasksCount = 0
 
         while (completedTasksCount != tasks.size && !tasksLauncher.stopped) {
-            val measuredTaskResult = tasksLauncher.takeNextCompleted()
-            completedTasks.add(measuredTaskResult)
+            completedTasks += tasksLauncher.takeNextCompleted()
 
             completedTasksCount++
             terminal.statusLine("$completedTasksCount / ${tasks.size} downloads completed")
@@ -70,7 +68,7 @@ class ConsoleDownloaderApp private constructor(private val settings: Settings) :
     }
 
     override fun close() {
-        log.debug("Closing app")
+        log.debug("Closing app...")
         tasksLauncher.stop()
         log.debug("App closed")
     }

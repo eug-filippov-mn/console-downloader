@@ -36,12 +36,12 @@ class TasksLauncher(settings: Settings) {
 
     private lateinit var launcherThread: Thread
 
-    fun start(tasks: List<DownloadTask>) {
+    fun startDownloading(tasks: List<DownloadTask>) {
         launcherThread = thread(name = "launcher-thrd") {
             try {
                 tasks.forEach(this::executeTask)
             } catch (e: InterruptedException) {
-                log.debug("Launcher thread interrupted")
+                log.debug("Launcher thread was interrupted")
                 stopped = true
                 Thread.currentThread().interrupt()
             }
@@ -82,7 +82,7 @@ class TasksLauncher(settings: Settings) {
         launcherThread.interrupt()
 
         log.debug("Shutting down executor...")
-        MoreExecutors.shutdownAndAwaitTermination(downloadTasksExecutor, 5, TimeUnit.SECONDS)
+        MoreExecutors.shutdownAndAwaitTermination(downloadTasksExecutor, 1, TimeUnit.MINUTES)
         log.debug("Executor shut down")
     }
 
