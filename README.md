@@ -1,5 +1,8 @@
 # console-downloader
 
+#### Requirements
+Java 1.8 and higher
+
 #### Build and package
 ```
 ./gradlew jar
