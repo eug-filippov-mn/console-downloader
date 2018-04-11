@@ -16,7 +16,10 @@ object Opts {
             Option.builder("f")
                     .longOpt("links-file-path")
                     .argName("LINKS_FILE_PATH")
-                    .desc("Path to file with links list. Valid file format is <HTTP link><whitespace><file name>")
+                    .desc(
+                            "Path to file with links list. "
+                            + "Valid file's line format is <HTTP|HTTPS link>whitespace<file name>"
+                    )
                     .hasArg()
                     .required()
                     .build()
@@ -25,7 +28,7 @@ object Opts {
             Option.builder("o")
                     .longOpt("output-dir-path")
                     .argName("OUTPUT_DIR_PATH")
-                    .desc("Path to dir for downloaded files")
+                    .desc("Path to dir where downloaded files will be saved")
                     .hasArg()
                     .required()
                     .build()
@@ -34,7 +37,11 @@ object Opts {
             Option.builder("l")
                     .longOpt("speed-limit")
                     .argName("SPEED_LIMIT")
-                    .desc("Speed limit for all threads")
+                    .desc(
+                            "Download speed limit for all threads. Speed value can be used with suffixes - k,m "
+                            + "to set speed in kilobytes or megabytes respectively. If suffix is not passed,"
+                            + " value treated as speed in bytes. Speed can be passed as integer or as double"
+                    )
                     .hasArg()
                     .required()
                     .build()
@@ -43,7 +50,11 @@ object Opts {
             Option.builder("i")
                     .longOpt("interactive-mode")
                     .hasArg(false)
-                    .desc("If passed, app shows continue dialog when there are invalid rows in links file")
+                    .desc(
+                            "If passed, instead of exit with error, app shows continue dialog when there are "
+                            + "invalid rows in links file. If file contains more than 100 rows, invalid rows' "
+                            + "numbers will be written to ~/console-downloader.invalid-rows-report"
+                    )
                     .build()
 
     val help: Option =
