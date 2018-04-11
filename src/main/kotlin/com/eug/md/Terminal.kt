@@ -9,6 +9,7 @@ import org.apache.commons.cli.HelpFormatter
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.PrintStream
+import java.text.NumberFormat
 import java.util.*
 
 
@@ -33,12 +34,11 @@ class Terminal {
     }
 
     fun statusLine(message: String) {
+        val formattedMessage = "\r> ${message.padEnd(STATUS_LINE_LENGTH)}"
         if (log.isDebugEnabled) {
-            log.debug(message)
+            log.debug(formattedMessage)
         } else {
-            out.print("\r")
-            out.print("> ")
-            out.print(message)
+            out.print(formattedMessage)
         }
     }
 
@@ -73,6 +73,7 @@ class Terminal {
 
     private object ToTableFormatter {
         private val HEADERS = arrayOf("#", "Url", "Status", "Downloaded bytes", "Execution time, ms")
+        private val numberFormat = NumberFormat.getInstance()
 
         fun format(result: MeasuredResult<List<MeasuredResult<DownloadResult>>>) : String {
             val (totalExecutionTime, downloadMeasuredResults) = result
@@ -84,18 +85,18 @@ class Terminal {
                             Column(measuredResult.result.taskNumber),
                             Column(measuredResult.result.url),
                             Column(formatStatus(measuredResult.result)),
-                            Column(measuredResult.result.savedBytesCount),
-                            Column(measuredResult.executionTime)
+                            Column(numberFormat.format(measuredResult.result.savedBytesCount)),
+                            Column(numberFormat.format(measuredResult.executionTime))
                     )
                 })
-                //todo add number format
+
                 addTotal(
                         Column("Total downloaded bytes", colspan = 3),
-                        Column(toTotalDownloadedBytesSize(downloadMeasuredResults), colspan = 2)
+                        Column(numberFormat.format(toTotalDownloadedBytesSize(downloadMeasuredResults)), colspan = 2)
                 )
                 addTotal(
                         Column("Total execution time, ms", colspan = 3),
-                        Column(totalExecutionTime, colspan = 2)
+                        Column(numberFormat.format(totalExecutionTime), colspan = 2)
                 )
                 setAlignment(TextAlignment.CENTER)
             }
@@ -121,6 +122,7 @@ class Terminal {
     }
 
     companion object {
+        private const val STATUS_LINE_LENGTH = 100
         private val log: Logger = LoggerFactory.getLogger(Terminal::class.java)
     }
 }
