@@ -1,7 +1,7 @@
 # console-downloader
 
 #### Requirements
-Java 1.8 and higher
+Java 1.8
 
 #### Build and package
 ```
