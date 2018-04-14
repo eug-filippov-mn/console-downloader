@@ -62,7 +62,7 @@ class ConsoleDownloaderApp private constructor(private val settings: Settings) :
                     exitProcess(0)
                 }
             } else {
-                throw InvalidLinksFileFormat(settings.linksFilePath, tasksCreationResult.invalidRowNumbers)
+                throw InvalidLinksFileFormatException(settings.linksFilePath, tasksCreationResult.invalidRowNumbers)
             }
         }
     }

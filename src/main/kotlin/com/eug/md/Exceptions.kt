@@ -38,7 +38,7 @@ open class LinksFileParseException(msg: String, cause: Throwable? = null) : Cons
     }
 }
 
-class InvalidLinksFileFormat(val linksFilePath: Path, val rowNumbers: List<Int>) :
+class InvalidLinksFileFormatException(linksFilePath: Path, rowNumbers: List<Int>) :
         LinksFileParseException("Invalid links file - \"$linksFilePath\". Invalid format at rows - $rowNumbers")
 
 class UnexpectedResponseStatusException(statusCode: Int)

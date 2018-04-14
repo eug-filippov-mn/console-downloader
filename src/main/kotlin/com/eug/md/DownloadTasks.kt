@@ -71,7 +71,7 @@ object DownloadTaskFactory {
 
         if (urlsToFileNames.isEmpty) {
             if (invalidRowNumbers.isNotEmpty()) {
-                throw InvalidLinksFileFormat(linksFilePath, invalidRowNumbers)
+                throw InvalidLinksFileFormatException(linksFilePath, invalidRowNumbers)
             }
             throw LinksFileParseException.noContent(linksFilePath)
         }
