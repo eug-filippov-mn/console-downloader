@@ -80,7 +80,7 @@ class Terminal {
 
             val table = AsciiTable().apply {
                 addHeaders(HEADERS)
-                addRows(downloadMeasuredResults, columns = { measuredResult ->
+                addRows(downloadMeasuredResults.sortedBy { it.result.taskNumber }, columns = { measuredResult ->
                     arrayOf(
                             Column(measuredResult.result.taskNumber),
                             Column(measuredResult.result.url),

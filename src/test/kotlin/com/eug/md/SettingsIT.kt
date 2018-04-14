@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.extension.ExtendWith
 import java.io.File
 import java.nio.file.Files
@@ -36,7 +38,10 @@ class SettingsIT {
         val notValidOptionsException = Assertions.assertThrows(NotValidOptionsException::class.java) {
             Settings.from(ArgParser.parse(emptyArray()))
         }
-        assertEquals("Missing required options: n, f, o, l", notValidOptionsException.message)
+        assertEquals(
+                "Missing required options: n, f, o, l. Run app with --help argument to print help information",
+                notValidOptionsException.message
+        )
     }
 
     @Test
@@ -110,6 +115,7 @@ class SettingsIT {
         assertEquals("LINKS_FILE_PATH must be a file, not a directory", notValidOptionsException.message)
     }
 
+    @EnabledOnOs(OS.LINUX)
     @Test
     fun `setting creation from arguments where links file is not readable should throw exception with valid msg`() {
         linksFile.setReadable(false)
@@ -140,6 +146,7 @@ class SettingsIT {
         assertEquals("OUTPUT_DIR_PATH must be a directory", notValidOptionsException.message)
     }
 
+    @EnabledOnOs(OS.LINUX)
     @Test
     fun `setting creation from arguments where out dir hasn't write permissions should throw exception with valid msg`() {
         outDir.setWritable(false)

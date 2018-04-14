@@ -15,7 +15,7 @@ class SpeedLimitParserTest {
     }
 
     @Test
-    fun `should throw a parse exception when number with suffix differs from "k" or "m" passed`() {
+    fun `should throw a parse exception when number with suffix differs from k or m passed`() {
         assertThrows(SpeedLimitParseException::class.java) {
             SpeedLimitParser.parseAsBytes("10Mb")
         }
@@ -27,12 +27,12 @@ class SpeedLimitParserTest {
     }
 
     @Test
-    fun `should convert number to double multiply it by 1024 when number with "k" suffix passed`() {
+    fun `should convert number to double multiply it by 1024 when number with k suffix passed`() {
         assertEquals(SpeedLimitParser.parseAsBytes("10k"), 10.0 * 1024)
     }
 
     @Test
-    fun `should convert number to double multiply it by 1024 * 1024 when number with "m" suffix passed`() {
+    fun `should convert number to double multiply it by 1024 and 1024 when number with m suffix passed`() {
         assertEquals(SpeedLimitParser.parseAsBytes("10m"), 10.0 * 1024 * 1024)
     }
 }

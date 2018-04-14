@@ -5,6 +5,8 @@ import io.github.glytching.junit.extension.folder.TemporaryFolderExtension
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.function.Executable
 import java.nio.file.Paths
@@ -30,6 +32,7 @@ class DownloadTaskFactoryIT {
         assertEquals("Unable to read links cause no such file - \"$notExistedFilePath\"", exception.message)
     }
 
+    @EnabledOnOs(OS.LINUX)
     @Test
     fun `should throw parse exception when passed path to file which doesn't have read permission`() {
         val linksFile = tempFolder.createFile(linksFileName)

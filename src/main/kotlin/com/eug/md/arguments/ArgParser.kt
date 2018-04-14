@@ -4,6 +4,7 @@ import com.eug.md.NotValidOptionsException
 import com.eug.md.utils.hasOption
 import org.apache.commons.cli.CommandLine
 import org.apache.commons.cli.DefaultParser
+import org.apache.commons.cli.MissingOptionException
 import org.apache.commons.cli.ParseException
 
 object ArgParser {
@@ -23,7 +24,15 @@ object ArgParser {
         try {
             return block()
         } catch (e: ParseException) {
-            throw NotValidOptionsException(e.message ?: "Options parse error", e)
+            throw NotValidOptionsException(resolveMessage(e), e)
         }
+    }
+
+    private fun resolveMessage(e: ParseException): String {
+        val exceptionMessage = e.message ?: "Options parse error"
+        if (e is MissingOptionException) {
+            return exceptionMessage + ". Run app with --help argument to print help information"
+        }
+        return exceptionMessage
     }
 }
