@@ -28,3 +28,4 @@ Option | Description |
 -i,--interactive-mode | If passed, instead of exit with error, app shows continue dialog when there are invalid rows in links file. If file contains more than 100 rows, invalid rows' numbers will be written to ~/console-downloader.invalid-rows-report
 
 
+large files with links can be generated throught https://github.com/eug-filippov-mn/page-parser
